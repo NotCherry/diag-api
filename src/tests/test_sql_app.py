@@ -32,11 +32,14 @@ client = TestClient(app)
 
 TEST_USER = {"email": "deadpool@example.com",
              "password": "chimichangas4life",
-             "username": "testerjordan"}
+             "username": "testerjordan", "id": 1}
 
-TEST_PROJECT = {"owner_id": 1, "name": "Test Project", "description": "This is a test project", "organization_id": None, "status_code": 1}
+TEST_PROJECT = { "name": "Test Project", "description": "This is a test project", "status_code": 1}
+
+TEST_ORGANIZATION = {"name": "Test Organization", "description": "This is a test organization", "owner_id": 1}
 
 
+TEST_DIAGRAM = {"title": "Test Diagram", "description": "This is a test diagram", "config": "asdasdqaw3f2r21q125", "project_id": 1}
 
 def create_user():
     response = client.post(
@@ -50,7 +53,7 @@ def create_user():
 def get_token():
     response = client.post(
         "/token",
-        data={"username": TEST_USER["username"], "password": TEST_USER["password"]},
+        data={"username": TEST_USER["email"], "password": TEST_USER["password"]},
     )
     assert response.status_code == 200, response.text
 
@@ -71,11 +74,7 @@ def test_create_user():
 
 
 def test_get_user_by_id():
-    init_db()
-    user_id = create_user()["id"]
-    
-
-    response = client.get(f"/users/{user_id}")
+    response = client.get(f"/users/{TEST_USER['id']}")
     assert response.status_code == 200, response.text
 
     data = response.json()
@@ -84,14 +83,12 @@ def test_get_user_by_id():
 
     
 def test_create_user_project():
-    init_db()
-    user_id = create_user()["id"]
-
     init_status_code(Session(engine))
 
     response = client.post(
-        "/projects",
+        "/project",
         json=TEST_PROJECT,
+        headers=auth_header()
     )
 
     assert response.status_code == 200, response.text
@@ -99,35 +96,101 @@ def test_create_user_project():
     data = response.json()
     assert data["name"] == TEST_PROJECT["name"]
     assert data["description"] == TEST_PROJECT["description"]
-    assert int(data["owner_id"]) == user_id
     assert data["status_code"] == 1
 
 
 def test_get_user_projects():
-    init_db()
-    user_id = create_user()["id"]
-    init_status_code(Session(engine))
-    response = client.post(
-        "/projects",
-        json=TEST_PROJECT,
-        headers=auth_header()
-    )
-    assert response.status_code == 200, response.text
+    response = client.get(f"/project", headers=auth_header())
    
-    response = client.get(f"/projects", headers=auth_header())
-
     data = response.json()
-    assert len(data) >= 1
+    assert len(data) == 1
     assert data[0]["name"] == TEST_PROJECT["name"]
     assert data[0]["description"] == TEST_PROJECT["description"]
-    assert int(data[0]["owner_id"]) == user_id
     assert data[0]["status_code"] == 1
 
+def test_create_diagram_in_project():
+    response = client.post(f"/project/{1}/diagram", json=TEST_DIAGRAM, headers=auth_header())
+
+    data = response.json()
+    assert data["title"] == TEST_DIAGRAM["title"]
+    assert data["description"] == TEST_DIAGRAM["description"]
+    assert data["config"] == TEST_DIAGRAM["config"]
+    assert data["project_id"] == 1
+
+def test_get_diagrams_by_project():
+    response = client.get(f"/project/{1}/diagram", headers=auth_header())
+
+    data = response.json()
+    print(data)
+    assert len(data) == 1
+    assert data[0]["title"] == TEST_DIAGRAM["title"]
+    assert data[0]["description"] == TEST_DIAGRAM["description"]
+    assert data[0]["config"] == TEST_DIAGRAM["config"]
+    assert data[0]["project_id"] == 1
+
+def test_get_diagram_by_id():
+    response = client.get(f"/diagram/{1}", headers=auth_header())
+
+    data = response.json()
+
+    print(data)
+    assert data["title"] == TEST_DIAGRAM["title"]
+    assert data["description"] == TEST_DIAGRAM["description"]
+    assert data["config"] == TEST_DIAGRAM["config"]
+    assert data["project_id"] == 1
+
+def test_get_project_by_id():
+    response = client.get(f"/project/{1}", headers=auth_header())
+
+    data = response.json()
+    assert data["name"] == TEST_PROJECT["name"]
+    assert data["description"] == TEST_PROJECT["description"]
+    assert data["status_code"] == 1
+
+
 def test_create_org():
-    pass
+    response = client.post(f"/organization", json=TEST_ORGANIZATION, headers=auth_header())
+   
+    data = response.json()
+    assert data["name"] == TEST_ORGANIZATION["name"]
+    assert data["description"] == TEST_ORGANIZATION["description"]
+    assert data["owner_id"] == TEST_USER["id"]
+
+def test_get_org_by_id():
+    response = client.get(f"/organization/1",headers=auth_header())
+
+    data = response.json()
+    print(data)
+    assert data["name"] == TEST_ORGANIZATION["name"]
+    assert data["description"] == TEST_ORGANIZATION["description"]
+    assert data["owner_id"] == TEST_USER["id"]
+
+
 
 def test_create_org_project():
-    pass
+    for x in range(2):
+        post_data = {
+        "org_id": 1,
+        "project": TEST_PROJECT
+        }
+
+        response = client.post(f"/organization/project", json=post_data, headers=auth_header())
+    
+        data = response.json()
+        print(data)
+        assert data["name"] == TEST_PROJECT["name"]
+        assert data["description"] == TEST_PROJECT["description"]
+        assert data["status_code"] == 1
 
 def test_get_org_projects():
-    pass
+    response = client.get(f"/organization/{1}/project",headers=auth_header())
+
+    data = response.json()
+    print(data)
+    assert len(data) == 2
+    assert data[0]["name"] == TEST_PROJECT["name"]
+    assert data[0]["description"] == TEST_PROJECT["description"]
+    assert data[0]["status_code"] == 1
+    assert data[1]["name"] == TEST_PROJECT["name"]
+    assert data[1]["description"] == TEST_PROJECT["description"]
+    assert data[1]["status_code"] == 1

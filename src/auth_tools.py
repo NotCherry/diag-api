@@ -1,11 +1,10 @@
 from datetime import datetime, timedelta, timezone
 from typing import  Union
 
-from fastapi import Depends
 from sqlmodel import Session
 
-from src.util import get_db, verify_password
-from .crud import get_user_email, get_user_username
+from src.util import verify_password
+from .crud import get_user_email
 
 import jwt
 import os
@@ -20,8 +19,8 @@ def create_access_token(data: dict, expires_delta: Union[timedelta, None] = None
     encoded_jwt = jwt.encode(to_encode, os.getenv("SECRET_KEY"), algorithm=os.getenv("ALGORITHM"))
     return encoded_jwt
 
-def authenticate_user(db: Session, username: str, password: str ):
-    user = get_user_username(db, username)
+def authenticate_user(db: Session, email: str, password: str ):
+    user = get_user_email(db, email)
     if not user:
         return False
     if not verify_password(password, user.password):
