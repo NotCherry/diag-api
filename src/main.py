@@ -4,7 +4,7 @@ from fastapi import Depends, FastAPI
 
 from contextlib import asynccontextmanager
 from fastapi.responses import JSONResponse
-from sqlmodel import SQLModel, Session
+from sqlmodel import SQLModel, Session, select
 
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -19,14 +19,17 @@ from .routers import graph_processor
 from .routers import user
 from .routers import project
 from .routers import organizations
-from src.routers import diagram
-
+from .routers import diagram
+from .routers import recent
+from . import models
 from .database import engine
 
 load_dotenv()
 
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
+    if (len(Session(engine).exec(select(models.ProjectStatusCode)).all()) == 3):
+        return
     with Session(engine) as session:
         init_status_code(session)
 
@@ -43,7 +46,7 @@ app.include_router(auth.router)
 app.include_router(project.router)
 app.include_router(organizations.router)
 app.include_router(diagram.router)
-
+app.include_router(recent.router)
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)

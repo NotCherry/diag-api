@@ -45,6 +45,10 @@ async def get_current_active_user(
 
 def create_user(db: Session, email: str, username: str, password: str):
     hashed_password = get_password_hash(password)
+
+    if hashed_password == '':
+        raise HTTPException(status_code=400, detail="Password is empty")
+
     db_user = models.User(email=email, username=username,
                           password=hashed_password)
     db.add(db_user)
@@ -60,13 +64,26 @@ def create_user_project(db: Session, project: models.Project, user_id: int):
     db.refresh(db_project)
     return db_project
 
-def create_diagram_in_project(db: Session, diagram: models.Diagram, project_id: int):
+def create_diagram_in_project(db: Session, diagram: models.Diagram, project_id: int, user_id:int):
     db_diagram = models.Diagram(**diagram.model_dump(), owner_id=project_id)
     db.add(db_diagram)
     db.commit()
     db.refresh(db_diagram)
+
+
+    db_last_diagram = models.LastUsedDiagram(diagram_id=db_diagram.id, user_id=user_id )
+    db.add(db_last_diagram)
+    db.commit()
+    db.refresh(db_last_diagram)
     return db_diagram
 
+def get_last_diagrams(db: Session, user_id):
+    try:
+        data = db.exec(select(models.Diagram).where(models.Diagram.id == models.LastUsedDiagram.diagram_id).where(models.LastUsedDiagram.user_id == user_id).order_by(models.LastUsedDiagram.updated_at.desc()).limit(5)).all()    
+        print(data)
+        return data
+    except Exception:
+        print("Error")
 def get_projects_by_user(db: Session, id: int):
     return db.exec(select(models.Project).join(models.UserProject).where(models.UserProject.user_id == id)).all()
 
@@ -97,7 +114,13 @@ def get_diagram_by_id(db: Session, id: int, user_id: int):
     access = db.exec(select(models.UserProject).where(models.UserProject.user_id == user_id, models.UserProject.project_id == diagram.project_id)).first()
     if access is None:
         raise HTTPException(status_code=400, detail="User does not have access to the project")
-    
+     
+    if (db.exec(select(models.LastUsedDiagram).order_by(models.LastUsedDiagram.updated_at.desc())).first().id != id):
+        db_last_diagram = models.LastUsedDiagram(diagram_id=diagram.id, user_id=user_id )
+        db.add(db_last_diagram)
+        db.commit()
+        db.refresh(db_last_diagram)
+
     return diagram
 
 def get_project_by_id(db: Session, id: int, user_id: int):

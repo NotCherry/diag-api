@@ -1,10 +1,9 @@
 
 from fastapi.security import OAuth2PasswordBearer
-from passlib.context import CryptContext
+import bcrypt
 from sqlmodel import Session
 from .database import engine
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
@@ -17,8 +16,12 @@ def get_db():
 
 
 def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
+    return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
 
 
 def get_password_hash(password):
-    return pwd_context.hash(password)
+    if password is None:
+        return ""
+    salt = bcrypt.gensalt()
+    pw = bcrypt.hashpw(password.encode('utf-8'), salt)
+    return pw.decode('utf-8')

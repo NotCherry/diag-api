@@ -72,3 +72,8 @@ class Token(SQLModel, RecordExtender, table=False):
 class TokenData(SQLModel, RecordExtender, table=False):
     id: int | None = Field(default=None, primary_key=True)
     username: Union[str, None] = None
+
+class LastUsedDiagram(SQLModel, RecordExtender, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    diagram_id : int = Field(foreign_key="diagrams.id")
+    user_id: int = Field(foreign_key="user.id")

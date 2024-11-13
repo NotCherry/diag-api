@@ -28,4 +28,4 @@ def db_create_user_project(project_id: int, db: Session = Depends(get_db), user:
 
 @router.post("/project/{project_id}/diagram")
 def db_create_user_project(project_id: int,diagram: Diagram, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    return create_diagram_in_project(db, diagram, project_id)
+    return create_diagram_in_project(db, diagram, project_id, user.id)
