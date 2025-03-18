@@ -79,8 +79,7 @@ def create_diagram_in_project(db: Session, diagram: models.Diagram, project_id: 
 
 def get_last_diagrams(db: Session, user_id):
     try:
-        data = db.exec(select(models.Diagram).where(models.Diagram.id == models.LastUsedDiagram.diagram_id).where(models.LastUsedDiagram.user_id == user_id).order_by(models.LastUsedDiagram.updated_at.desc()).limit(5)).all()    
-        print(data)
+        data = db.exec(select(models.Diagram).where(models.Diagram.id == models.LastUsedDiagram.diagram_id).where(models.LastUsedDiagram.user_id == user_id).order_by(models.LastUsedDiagram.updated_at.desc()).limit(5)).all()
         return data
     except Exception:
         print("Error")
@@ -125,11 +124,18 @@ def get_diagram_by_id(db: Session, id: int, user_id: int):
     print("We did it diagram:", diagram, st)
     return diagram
 
-def update_diagram_config(db: Session, diagram_id: int, diagram_config, user_id: int):
-    diagram = db.exec(select(models.Diagram).where(models.Diagram.id == diagram_id)).first()
+def update_diagram_config(db: Session, diagram_id: int, diagram_config: str, diagram_image: str, user_id: int):
+    diagram: models.Diagram = db.exec(select(models.Diagram).where(models.Diagram.id == diagram_id)).first()
     if diagram == None:
         raise HTTPException(404, "Not found")
+    
+    project: models.Project = db.exec(select(models.Project).where(models.Project.id == diagram.project_id)).first() 
+    access = not project.owner_is_org and project.owner_id == user_id
+    if not access:
+        raise HTTPException(status_code=400, detail="User does not have access to the project")  
+    
     diagram.config = diagram_config
+    diagram.image = diagram_image
     db.add(diagram)
     db.commit()
     db.refresh(diagram)
@@ -186,3 +192,16 @@ def create_project_in_organization(db: Session, org_id: str, proj: models.Projec
     db.refresh(db_project)
 
     return db_project
+
+def create_generated_conted(db: Session, content: models.GeneratedContent):
+    db.add(content)
+    db.commit()
+    db.refresh(content)
+
+def create_executed_config(db: Session, diagram_id: int, config: str):
+    config = models.ExecutedDiagramConfig(diagram_id=diagram_id, config=config)
+    db.add(config)
+    db.commit()
+    db.refresh(config)
+
+    return config

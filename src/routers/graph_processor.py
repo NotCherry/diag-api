@@ -4,6 +4,9 @@ import json
 import logging
 import traceback
 import re
+from ..crud import create_executed_config, create_generated_conted
+from src.util import get_db
+from src import models
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -71,8 +74,10 @@ async def process_nodes(req, socket: WebSocket, local = False):
         map_of_processed_nodes[x] = map_of_nodes[x]
 
 
-    number_of_loops = 0    
-    while len(map_of_processed_nodes.keys()) != len(map_of_nodes.keys()):
+    exec_id = create_executed_config(next(get_db()), req["diagram_id"], req['config']).id
+
+    breaking_error = False;
+    while len(map_of_processed_nodes.keys()) != len(map_of_nodes.keys()) and breaking_error == False:
         for node_id in nodes_to_execute:
             logger.warning(map_of_nodes[node_id]['nodeType'])
             keys = map_of_processed_nodes.keys()
@@ -86,24 +91,36 @@ async def process_nodes(req, socket: WebSocket, local = False):
                 prompt = prompt.format(*context)
                 
                 if (local):
-                    await socket.send_text(json.dumps({ "type": "run_local", "data": {"url": "http://localhost:1234/v1/completions", "data": {"id": node_id, "prompt": prompt}}}))
-                    rr = await socket.receive_text()
-                    logger.info(rr)
-                    sreq = json.loads(rr)
+                    # await socket.send_text(json.dumps({ "type": "run_local", "data": {"url": "http://localhost:1234/v1/completions", "data": {"id": node_id, "prompt": prompt}}}))
+                    await socket.send_text(json.dumps({ "type": "run_local", "data": {"url": "http://localhost:1234/v1/chat/completions", "data": {"id": node_id, "messages": [{"role": "system", "content": "You are a helpful assistant that provides concise and accurate answers."},
+    {"role": "user", "content": prompt}] }}}))
 
+                    rr = await socket.receive_text()
+                    
+                    sreq = json.loads(rr)
                     if sreq['type'] == "local_llm":
                         response_LLM = sreq['data']
+                    elif sreq['type'] == "local_conn_error":
+                        breaking_error = True
+                        break
+
                 else:
                     response_LLM = await askLLM(prompt)
                     await socket.send_text(json.dumps({ "type": "update_node", "data": {"id": node_id, "data": response_LLM}}))
                 map_of_processed_nodes[node_id] = response_LLM
+                node_type = 1 if map_of_nodes[node_id]['nodeType'] != "output" else 2
+
+                create_generated_conted(next(get_db()), models.GeneratedContent(diagram_id=req["diagram_id"], content=response_LLM, type_id=node_type, config_id = exec_id, node_id = node_id ))
             else:        
                 map_of_processed_nodes[node_id] = map_of_nodes[node_id]['data']['text']
             
+            
+
             if map_of_nodes[node_id]['nodeType'] == "output":
                 map_of_processed_nodes[node_id] = map_of_nodes[node_id]['data']['text']
                 await socket.send_text(json.dumps({ "type": "update_node", "data": {"id": node_id, "data": response_LLM}}))
                 await socket.send_text(json.dumps({ "type": "run_compleated", "data": {"text": response_LLM }}))
+                
 
             executed_nodes_in_iteration.append(node_id)
             if (map_of_nodes[node_id]['nodeType'] != 'output'):

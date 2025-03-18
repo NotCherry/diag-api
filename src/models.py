@@ -11,11 +11,11 @@ class RecordExtender():
 
 class Diagram(SQLModel, RecordExtender, table=True):
     __tablename__ = "diagrams"
-
     id: int | None = Field(default=None, primary_key=True)
     title: str = Field(index=True)
     description: str = Field(index=True)
-    config: str = Field()
+    config: str | None = ''
+    image: str | None = ''
     project_id: int = Field(foreign_key="project.id")
 
 class UserProject(SQLModel, RecordExtender, table=True):
@@ -77,3 +77,21 @@ class LastUsedDiagram(SQLModel, RecordExtender, table=True):
     id: int | None = Field(default=None, primary_key=True)
     diagram_id : int = Field(foreign_key="diagrams.id")
     user_id: int = Field(foreign_key="user.id")
+
+
+class NodeType(SQLModel, RecordExtender, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    type: str
+
+class ExecutedDiagramConfig(SQLModel, RecordExtender, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    diagram_id : int = Field(foreign_key="diagrams.id")
+    config: str
+
+class GeneratedContent(SQLModel, RecordExtender, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    diagram_id : int = Field(foreign_key="diagrams.id")
+    type_id: int = Field(foreign_key="nodetype.id")
+    config_id: int = Field(foreign_key="executeddiagramconfig.id")
+    content: str
+    node_id: int

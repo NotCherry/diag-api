@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 from typing import Annotated
 from fastapi import Depends, FastAPI, Request, WebSocket
 import sentry_sdk
+import time
 
 from contextlib import asynccontextmanager
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -12,7 +13,7 @@ from slowapi.errors import RateLimitExceeded
 
 from src.crud import get_current_user
 
-from src.tests.initialize_data import init_status_code
+from src.tests.initialize_data import init_node_type, init_status_code
 
 from .routers import limiter
 from .routers import auth
@@ -27,13 +28,13 @@ from .database import engine
 
 load_dotenv()
 
-sentry_sdk.init(
-    dsn="https://8ac3a0361c80254fba65ac1194c102ff@o4508319072518144.ingest.de.sentry.io/4508319140347984",
-    traces_sample_rate=1.0,
-    _experiments={
-        "continuous_profiling_auto_start": True,
-    },
-)
+# sentry_sdk.init(
+#     dsn="https://8ac3a0361c80254fba65ac1194c102ff@o4508319072518144.ingest.de.sentry.io/4508319140347984",
+#     traces_sample_rate=1.0,
+#     _experiments={
+#         "continuous_profiling_auto_start": True,
+#     },
+# )
 
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
@@ -41,6 +42,10 @@ def create_db_and_tables():
         return
     with Session(engine) as session:
         init_status_code(session)
+    if (len(Session(engine).exec(select(models.NodeType)).all()) == 2):
+        return
+    with Session(engine) as session:
+        init_node_type(session)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -49,15 +54,15 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-# @app.middleware("http")
-# async def add_process_time_header(request: Request, call_next):
-#     body = await request.body()
-#     print(body.decode('utf-8'))
-#     start_time = time.perf_counter()
-#     response = await call_next(request)
-#     process_time = time.perf_counter() - start_time
-#     response.headers["X-Process-Time"] = str(process_time)
-#     return response
+@app.middleware("http")
+async def add_process_time_header(request: Request, call_next):
+    body = await request.body()
+    print(body.decode('utf-8'))
+    start_time = time.perf_counter()
+    response = await call_next(request)
+    process_time = time.perf_counter() - start_time
+    response.headers["X-Process-Time"] = str(process_time)
+    return response
 
 
 app.include_router(graph_processor.router)
