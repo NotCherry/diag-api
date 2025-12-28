@@ -18,6 +18,7 @@ def init_status_code(db: Session):
     db.refresh(status_code)
     return status_code
 
+
 def init_node_type(db: Session):
     print("init node type")
     node_type = NodeType(type="node")

@@ -36,28 +36,34 @@ load_dotenv()
 #     },
 # )
 
+
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
-    if (len(Session(engine).exec(select(models.ProjectStatusCode)).all()) == 3):
+    if len(Session(engine).exec(select(models.ProjectStatusCode)).all()) == 3:
         return
     with Session(engine) as session:
         init_status_code(session)
-    if (len(Session(engine).exec(select(models.NodeType)).all()) == 2):
+    if len(Session(engine).exec(select(models.NodeType)).all()) == 2:
         return
     with Session(engine) as session:
         init_node_type(session)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     create_db_and_tables()
     yield
 
+
 app = FastAPI(lifespan=lifespan)
+
 
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
     body = await request.body()
-    print(body.decode('utf-8'))
+    # if (request.method == "POST" or request.method == "PUT") and len(body) < 1000:
+        # print(f"Request body: {body}")
+    # print(body.decode("utf-8"))
     start_time = time.perf_counter()
     response = await call_next(request)
     process_time = time.perf_counter() - start_time
@@ -76,14 +82,16 @@ app.include_router(recent.router)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+
 @app.get("/")
 async def get(user: Annotated[str, Depends(get_current_user)]):
     return JSONResponse(content={"message": "Hello, World"}, status_code=200)
+
 
 # @app.websocket("/ws")
 # async def websocket_endpoint(websocket: WebSocket):
 #     await websocket.accept()
 #     while True:
 #         data = await websocket.receive_text()
-        
+
 #         await websocket.send_text(f"You sent: {data}")

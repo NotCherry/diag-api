@@ -13,9 +13,11 @@ from src.util import get_db
 
 router = APIRouter()
 
+
 @router.post("/token")
 async def login_for_access_token(
-    form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db: Session = Depends(get_db)
+    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+    db: Session = Depends(get_db),
 ) -> Token:
     user = authenticate_user(db, form_data.username, form_data.password)
     if not user:
@@ -24,13 +26,12 @@ async def login_for_access_token(
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
-    access_token_expires = timedelta(minutes=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES")))
+
+    access_token_expires = timedelta(
+        minutes=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
+    )
     access_token = create_access_token(
         data={"sub": user.username}, expires_delta=access_token_expires
     )
     t = Token(access_token=access_token, token_type="bearer")
     return t
-
-
-
